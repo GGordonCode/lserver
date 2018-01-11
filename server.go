@@ -106,9 +106,8 @@ func (s *server) handleConnection(conn net.Conn) {
 func (s *server) getPort() int {
 	if s.listener != nil {
 		return s.listener.Addr().(*net.TCPAddr).Port
-	} else {
-		return -1
 	}
+	return -1
 }
 
 // On shutdown, close the listener.  With a bit more work, we could

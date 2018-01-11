@@ -40,7 +40,9 @@ import (
 	"os"
 )
 
-// We may want to create another cache type at some point.
+// IndexCache is an interface that defines the methods for any line
+// server cache.  Thus we are not licked to this particular implmentation.
+// Normally this interface declaration would go in a different file/package.
 type IndexCache interface {
 	Lookup(lineno int64) (string, error)
 }
