@@ -27,4 +27,4 @@ Sample client usage:
 
 On the server side, the only mandatory argument is the pathname of a file to index.
 Options are: -server_addr defaults to "localhost:8080"
-             -cache_size upper bound on number of cached entries, default is one million (1024*1024) entries. 
+             -cache_size number of cached entries, default is one million (1024*1024) entries. 
