@@ -65,7 +65,7 @@ type lineOffsetCache struct {
 	totLines int64
 }
 
-// No built in sort of int64 in Go :-(
+// Int64Slice is neeed because no built in sort of int64 slices in Go :-(
 type Int64Slice []int64
 
 func (is Int64Slice) Len() int           { return len(is) }
