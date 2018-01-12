@@ -36,13 +36,13 @@ type lineServer struct {
 
 // The user may configure the IP address and cache size.  The algorithm
 // used for the cache, and it's relation to the cache size is docuemnted
-// in cache.go.  According to Amazon’s Text Stats feature, the median
-// length for all books is about 64,000 words, if that helps.
+// in the file 'cache.go'.  Fun fact: according to Amazon’s Text Stats
+// feature, the median length for all books is about 64,000 words.
 var (
 	addr = flag.String("server_addr", "localhost:8080",
 		"the address the server will listen for requests on")
 	cacheSize = flag.Int("cache_size", 1024*1024,
-		"recommended number of items to retain in the cache")
+		"number of line number/offset entries to cache")
 )
 
 func main() {

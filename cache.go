@@ -1,18 +1,21 @@
-// The static cache used to store the line number offsets of
-// each line in the file.  The cache is intentionally "variably sparse"
-// as a time/space tradeoff.  If a given line number is not found
-// in the cache, the line number with the highest value less than
-// the target line number is read, and from there enough lines are
-// read to get to the desired line.
+// Implementation of the static cache used to store the line number
+// offsets of each line in the file.  The cache is intentionally
+// "variably sparse" as a time/space tradeoff.  If a given line number
+// is not found in the cache, the line number with the highest value
+// less than the target line number is read, and from there enough lines
+// are read to get to the desired line.
 //
 // We are given a requested buffer length and determine the total number
-// of lines in the file.  The number of lines we actually store is
-// generally less than all, but we attempt to maintain uniform spacing
-// in the gaps.
+// of lines in the file.  The algorithm starts by maintaining uniform
+// spacing in the cache of file line numbers, but as this would lead to
+// unused slots in many cases, we insert additional cache entries with
+// closer spacing, so that the cache is ultimately entirely utilized.
 //
-// We can fine tune this better with a more sophisticated skipping method,
-// but for the sake of simplicity, we'll determine the number N such that
-// (1/N) of the lines in the file will fit in the cache
+// To get the inital spacing, we determine the number N such that
+// (1/N) of the lines in the file will fit in the cache, and then
+// add the additional entries.  The additional entries are randomly
+// chosen line numbers that would not be chosen for the cache using
+// the 1/N formaula.
 //
 // Example:
 //     requested buffer length = 1000
@@ -20,8 +23,7 @@
 //     Then 1 out of every 8 lines will fit in the cache.
 // The idea is to attain a good spread of entries such that
 // we can tend to minimize the number of lines read on average.
-// Note the cache may not be fully used, but this is where a
-// more sophisticated method would increase the precision.
+// Again, we'll ensure that the cache is 100% used by adding entries.
 // Note we assume the file contents never change, and that it is
 // newline-terminated text.
 //
@@ -37,7 +39,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
+	"sort"
 )
 
 // IndexCache is an interface that defines the methods for any line
@@ -60,6 +64,13 @@ type lineOffsetCache struct {
 	cache    []lineInfo
 	totLines int64
 }
+
+// No built in sort of int64 in Go :-(
+type Int64Slice []int64
+
+func (is Int64Slice) Len() int           { return len(is) }
+func (is Int64Slice) Swap(i, j int)      { is[i], is[j] = is[j], is[i] }
+func (is Int64Slice) Less(i, j int) bool { return is[i] < is[j] }
 
 var (
 	// Ensure type conforms to interface.
@@ -244,6 +255,26 @@ func buildCache(f *os.File, lineCnt int64,
 func processLines(f *os.File, li []lineInfo, numLines, skipFactor int64) (
 	[]lineInfo, error) {
 
+	// To ensure the cache is fully utilized, randomly pick some line
+	// numbers in the file that would not have been cached and add them
+	// during the cache population loop.
+	extras := make(Int64Slice, 0)
+	freeSlots := getUnusedSlotCount(numLines, len(li))
+	if freeSlots > 0 {
+		randSlots := rand.Perm(len(li))
+		for _, v := range randSlots {
+			if int64(v)%skipFactor == 0 {
+				// this value will already be cached
+				continue
+			}
+			extras = append(extras, int64(v))
+		}
+		extras = extras[:freeSlots]
+		if extras != nil {
+			sort.Sort(extras)
+		}
+	}
+
 	// One goal in this loop is to avoid unnecessary slice creation,
 	// so we'll read single buffered bytes instead of depending on
 	// ReadBytes(delim byte).
@@ -261,10 +292,15 @@ func processLines(f *os.File, li []lineInfo, numLines, skipFactor int64) (
 			}
 		}
 		if b == '\n' {
-			if line%skipFactor == 0 {
+			// Note: extras will not contain any mod skipFactor == 0 values
+			useExtra := len(extras) > 0 && extras[0] == line
+			if line%skipFactor == 0 || useExtra {
 				// Add this line to the cache.
 				li[nextSlot] = lineInfo{lineno: line, offset: saveOff}
 				nextSlot++
+				if useExtra {
+					extras = extras[1:]
+				}
 			}
 			saveOff = offset + 1
 			line++
@@ -272,4 +308,25 @@ func processLines(f *os.File, li []lineInfo, numLines, skipFactor int64) (
 		offset++
 	}
 	return li[:nextSlot], nil
+}
+
+// Gets the number of slots that would not be filled using the 1/N
+// algorithm.  Used to generate additional entries to fill the cache.
+func getUnusedSlotCount(lineCnt int64, cacheSize int) int {
+	var expectedCacheSize int
+	if lineCnt > int64(cacheSize) {
+		if lineCnt%int64(cacheSize) == 0 {
+			expectedCacheSize = cacheSize
+			//} else if lineCnt%int64(cacheSize) == 1 {
+			//expectedCacheSize = int(lineCnt / (lineCnt/int64(cacheSize) + 1))
+		} else {
+			expectedCacheSize = int(lineCnt / (lineCnt/int64(cacheSize) + 1))
+			if lineCnt%(lineCnt/int64(cacheSize)+1) != 0 {
+				expectedCacheSize++
+			}
+		}
+	} else {
+		expectedCacheSize = cacheSize
+	}
+	return cacheSize - expectedCacheSize
 }
