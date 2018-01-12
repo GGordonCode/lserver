@@ -268,8 +268,10 @@ func processLines(f *os.File, li []lineInfo, numLines, skipFactor int64) (
 				continue
 			}
 			extras = append(extras, int64(v))
+			if len(extras) == freeSlots {
+				break
+			}
 		}
-		extras = extras[:freeSlots]
 		if extras != nil {
 			sort.Sort(extras)
 		}
