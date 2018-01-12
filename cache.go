@@ -319,8 +319,6 @@ func getUnusedSlotCount(lineCnt int64, cacheSize int) int {
 	if lineCnt > int64(cacheSize) {
 		if lineCnt%int64(cacheSize) == 0 {
 			expectedCacheSize = cacheSize
-			//} else if lineCnt%int64(cacheSize) == 1 {
-			//expectedCacheSize = int(lineCnt / (lineCnt/int64(cacheSize) + 1))
 		} else {
 			expectedCacheSize = int(lineCnt / (lineCnt/int64(cacheSize) + 1))
 			if lineCnt%(lineCnt/int64(cacheSize)+1) != 0 {
