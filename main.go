@@ -34,9 +34,10 @@ type lineServer struct {
 	server *server
 }
 
-// The user may configuer the IP address and cache size.  The algorithm
+// The user may configure the IP address and cache size.  The algorithm
 // used for the cache, and it's relation to the cache size is docuemnted
-// in cache.go.
+// in cache.go.  According to Amazon’s Text Stats feature, the median
+// length for all books is about 64,000 words, if that helps.
 var (
 	addr = flag.String("server_addr", "localhost:8080",
 		"the address the server will listen for requests on")

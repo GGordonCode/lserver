@@ -22,9 +22,13 @@ func TestCache(t *testing.T) {
 	// Remove the directory at the end of the test.
 	cp := path.Join(tmpdir, "testfile.txt")
 	doTestCacheFile(t, cp, 3000, 32456, 10000)
-
-	cp = path.Join(tmpdir, "testfile2.txt")
+	doTestCacheFile(t, cp, 10, 21, 13)
 	doTestCacheFile(t, cp, 2500, 2500, 500)
+
+	// Big data tests
+	doTestCacheFile(t, cp, 1024*1024, 10*1024*1024, 7*1024*1024+539)
+	doTestCacheFile(t, cp, 1024*1024, 10*1024*1024+1, 3*1024*1024+107)
+	doTestCacheFile(t, cp, 1024*1024, 5*1024*1024+999, 5*1024*1024+999)
 }
 
 func doTestCacheFile(t *testing.T, filename string, cacheSize int,
@@ -33,8 +37,13 @@ func doTestCacheFile(t *testing.T, filename string, cacheSize int,
 	if err != nil {
 		t.Fatalf("create temp file: %v", err)
 	}
+	closed := false
 	defer os.Remove(filename)
-	defer f.Close()
+	defer func() {
+		if !closed {
+			f.Close()
+		}
+	}()
 
 	w := bufio.NewWriter(f)
 	for i := int64(0); i < lineCnt; i++ {
@@ -44,6 +53,10 @@ func doTestCacheFile(t *testing.T, filename string, cacheSize int,
 		}
 	}
 	w.Flush()
+	if err = f.Close(); err != nil {
+		t.Fatalf("close temp file: %v", err)
+	}
+	closed = true
 
 	c, err := newLineOffsetCache(filename, cacheSize)
 	if err != nil {
@@ -52,7 +65,13 @@ func doTestCacheFile(t *testing.T, filename string, cacheSize int,
 
 	var expectedCacheSize int
 	if lineCnt > int64(cacheSize) {
-		expectedCacheSize = int(lineCnt/(lineCnt/int64(cacheSize)+1) + 1)
+		if lineCnt%int64(cacheSize) == 0 {
+			expectedCacheSize = cacheSize
+		} else if lineCnt%int64(cacheSize) == 1 {
+			expectedCacheSize = int(lineCnt / (lineCnt/int64(cacheSize) + 1))
+		} else {
+			expectedCacheSize = int(lineCnt/(lineCnt/int64(cacheSize)+1) + 1)
+		}
 	} else {
 		expectedCacheSize = cacheSize
 	}
